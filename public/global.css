@@ -1,0 +1,33 @@
+.body--dark {
+    background-color: #1b1b1b;
+    color: white
+}
+
+h1,h2 {
+    font-family: 'Work Sans', sans-serif;
+}
+
+/* Grid system */
+.grid {
+    display: grid;
+    grid-column-gap: 15px;
+}
+.grid--inline {
+    display: inline-grid;
+    grid-column-gap: 15px;
+}
+.grid--12 {
+
+}
+.grid--10 {
+
+}
+
+.grid__col {
+    grid-column: 1 / 13
+}
+
+.grid__col--6 {
+    grid-column: 1 / 7;
+}
+
