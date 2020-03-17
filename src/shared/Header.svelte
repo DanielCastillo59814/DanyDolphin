@@ -1,3 +1,120 @@
+<script>
+    import { onMount, afterUpdate } from 'svelte';
+
+    export let sections = [];
+    let currentSection = 0;
+    let sidelineSectionHeight = 0;
+    let accumulatedHeight = 0;
+
+    $: initVariables(sections);
+
+    function getDocumentHeight() {
+        var body = document.body,
+            html = document.documentElement;
+        return Math.max( body.scrollHeight, body.offsetHeight, 
+            html.clientHeight, html.scrollHeight, html.offsetHeight );
+    }
+
+    function initSlider() {
+        const slider = document.getElementById('slider');
+        slider.addEventListener('touchstart', dragStart);
+        slider.addEventListener('touchend', dragEnd);
+        slider.addEventListener('touchmove', dragAction);
+        initVariables();
+    }
+
+    function initVariables() {
+        const slider = document.getElementById('slider');
+        if (slider !== null && sections.length > 0) {
+            syncDragOnScroll();
+            let st = slider.style.top;
+            let newTop = Number(st.substring(0, st.indexOf('px'))) + 7.5;
+            let height = document.documentElement.clientHeight;
+            sidelineSectionHeight = height / 10 * 9 / sections.length;
+            currentSection = 0;
+            accumulatedHeight = 0;
+            while(sidelineSectionHeight * currentSection > newTop
+                ||sidelineSectionHeight * (currentSection + 1) <= newTop) {
+                accumulatedHeight += sections[currentSection++].offsetHeight;
+            }
+        }
+    }
+
+    function syncDragOnScroll(e) {
+        const windowHeight = document.documentElement.clientHeight;
+        const documentHeight = getDocumentHeight() - windowHeight;
+        if (window.scrollY > accumulatedHeight + sections[currentSection].offsetHeight) {
+            accumulatedHeight += sections[currentSection++].offsetHeight;
+        } else if (window.scrollY < accumulatedHeight) {
+            accumulatedHeight -= sections[--currentSection].offsetHeight
+        }
+        const portion = (window.scrollY - accumulatedHeight)
+            / (sections[currentSection].offsetHeight - (currentSection === sections.length - 1 ? windowHeight - 70 : 0));
+        const slider = document.getElementById('slider');
+        console.log(portion);
+        slider.style.top = (sidelineSectionHeight * (currentSection + portion) - 7.5) + 'px';
+    }
+
+    function dragStart(e) {
+        e = e || window.event;
+        e.preventDefault();
+        document.onmouseup = dragEnd;
+        document.onmousemove = dragAction;
+    }
+
+    function dragAction (e) {
+        e = e || window.event;
+        let posY1 = 0;
+        if (e.type == 'touchmove') {
+            posY1 = e.touches[0].clientY;
+        } else {
+            posY1 = e.clientY;
+        }
+        let slider = document.getElementById('slider');
+        let height = document.documentElement.clientHeight;
+        let newTop = (posY1 - height / 20);
+        if (newTop >= 0 && newTop <= (height / 10 * 9)) {
+            slider.style.top = (newTop - 7.5) + "px";
+            window.removeEventListener('scroll', syncDragOnScroll);
+            if (newTop > sidelineSectionHeight * (currentSection + 1)) {
+                accumulatedHeight += sections[currentSection++].offsetHeight;
+            } else if (newTop <= sidelineSectionHeight * (currentSection)) {
+                accumulatedHeight -= sections[--currentSection].offsetHeight;
+            }
+            //which section height portion do i barrel?
+            let portion = (newTop - (sidelineSectionHeight * currentSection))
+                / sidelineSectionHeight;
+            //where do i scroll?
+            let scrollTo = accumulatedHeight + 
+                (sections[currentSection].offsetHeight - (currentSection === sections.length - 1 ? height : 0)) * portion;
+            //let it scroll!!
+            window.scrollTo(0, scrollTo);
+        }
+    }
+   
+    function dragEnd (e) {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        window.addEventListener('scroll', syncDragOnScroll);
+    }
+
+    function allowSlide(e) {
+        e.preventDefault();
+    }
+
+    function moveToSection(section) {
+        currentSection = section;
+        accumulatedHeight = 0;
+        let i = 0;
+        while (i < section)
+            accumulatedHeight += sections[i++].offsetHeight;
+        window.scrollTo(0, accumulatedHeight);
+    }
+
+    window.addEventListener('scroll', syncDragOnScroll);
+    onMount(initSlider);
+</script>
+
 <style>
     .sideline__container {
         position: fixed;
@@ -20,23 +137,21 @@
     .sideline__dot:hover, .sideline__slider:hover {
         background-color: white
     }
-    .sideline__dot--1 {
-        top: 0
+    .sideline__dot_tooltip {
+        position: absolute;
+        top: 5px;
+        left: 31px;
+        text-transform: uppercase;
+        font-family: 'Raleway', sans-serif;
+        font-weight: 800;
+        opacity: 0;
+        transition: opacity 0.2s ease-in,
+                    left 0.2s ease-in;
+
     }
-    .sideline__dot--2 {
-        top: calc(90vh / 5 - 17.5px)!important;
-    }
-    .sideline__dot--3 {
-        top: calc(90vh / 5 * 2 - 17.5px)!important;
-    }
-    .sideline__dot--4 {
-        top: calc(90vh / 5 * 3 - 17.5px)!important;
-    }
-    .sideline__dot--5 {
-        top: calc(90vh / 5 * 4 - 17.5px)!important;
-    }
-    .sideline__dot--6 {
-        bottom: 0
+    .sideline__dot:hover .sideline__dot_tooltip, .sideline__dot_tooltip.hover {
+        opacity: 1;
+        left: 41px;
     }
     .sideline__line {
         width: 1px;
@@ -56,82 +171,26 @@
         border: 2px solid #535353;
         border-radius: 15px;
         transition: background-color 0.3s ease,
-            top 0.1 s ease;
+            top 0.1s ease;
         z-index: 10;
+    }
+    .sideline__end {
+        position: absolute;
+        bottom: -5px;
+        width: 34px;
+        height: 10px;
+        background-color: #535353;
     }
 </style>
 
-<script>
-    let slideInit = false;
-
-    function getDocumentHeight() {
-        var body = document.body,
-            html = document.documentElement;
-        return Math.max( body.scrollHeight, body.offsetHeight, 
-            html.clientHeight, html.scrollHeight, html.offsetHeight );
-    }
-
-    window.addEventListener('scroll', function(e) {
-        const windowHeight = document.documentElement.clientHeight;
-        const documentHeight = getDocumentHeight();
-        const portion = window.scrollY / documentHeight;
-        const slider = document.getElementById('slider');
-        slider.style.top = 
-            /* 90vh * portion */ (windowHeight / 10 * 9 * portion) + 'px';
-    });
-
-    var posY1 = 0, posY2 = 0;
-
-    function dragStart(e) {
-        if (!slideInit) {
-            slideInit = true;
-            const slider = document.getElementById('slider');
-            slider.addEventListener('touchstart', dragStart);
-            slider.addEventListener('touchend', dragEnd);
-            slider.addEventListener('touchmove', dragAction);
-        }
-        e = e || window.event;
-        e.preventDefault();
-        document.onmouseup = dragEnd;
-        document.onmousemove = dragAction;
-    }
-
-    function dragAction (e) {
-        e = e || window.event;
-        let posY1 = 0;
-        if (e.type == 'touchmove') {
-            posY1 = e.touches[0].clientY;
-        } else {
-            posY1 = e.clientY;
-        }
-        let slider = document.getElementById('slider');
-        let height = document.documentElement.clientHeight;
-        let newTop = (posY1 - height / 20 - 7.5);
-        let portion = newTop / (height / 10 * 9);
-        console.log(portion +' '+ getDocumentHeight());
-        if (newTop >= 0 && newTop <= (height / 10 * 9 - 15)) {
-            slider.style.top = newTop + "px";
-            window.scrollTo(0, getDocumentHeight() * portion);
-        }
-    }
-   
-    function dragEnd (e) {
-        document.onmouseup = null;
-        document.onmousemove = null;
-    }
-
-    function allowSlide(e) {
-        e.preventDefault();
-    }
-</script>
-
 <div class="sideline__container">
     <div class="sideline__line"></div>
-    <div class="sideline__dot sideline__dot--1"></div>
-    <div class="sideline__dot sideline__dot--2"></div>
-    <div class="sideline__dot sideline__dot--3"></div>
-    <div class="sideline__dot sideline__dot--4"></div>
-    <div class="sideline__dot sideline__dot--5"></div>
-    <div class="sideline__dot sideline__dot--6"></div>
+    {#each sections as section, i}
+    <div class="sideline__dot" style="top: calc(90vh / {sections.length} * {i} - 17.5px)"
+        on:click={() => moveToSection(i)}>
+        <span class="sideline__dot_tooltip">{section.dataset.title}</span>
+    </div>
+    {/each}
     <div id="slider" class="sideline__slider" on:mousedown={dragStart}></div>
+    <div class="sideline__end"></div>
 </div>
